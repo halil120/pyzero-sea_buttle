@@ -1,0 +1,177 @@
+
+from enum import IntEnum, Enum, auto
+from collections import deque
+
+HEIGHT = 500
+WIDTH = 900
+# одно поле равен ~38
+
+class GameStates(Enum):
+    MENU=auto()
+    SHIPS_PLASE=auto()
+    GAME=auto()
+    VICTORY=auto()
+    DEFEAT=auto()
+    
+class Constants(IntEnum):
+    SPASE_OF_SCREEN=25 
+    SIZE_PICTURE=38 
+    
+class Textures(Enum):
+    SEA=images.piese_sea
+    BURNING=images.burning
+    SHIP=images.ship
+
+    
+class FieldObg:
+    def __init__(self):
+        self.is_sea=True
+        self.is_ship=False
+        self.is_shooten=False
+    def shoot(self):
+        self.is_shooten=True
+    def un_or_plase_ship(self):
+        self.is_ship=not self.is_ship
+        self.is_sea=not self.is_sea
+    def texture_give(self):
+        if self.is_shooten:
+            return Textures.BURNING.value
+        elif self.is_ship:
+            return Textures.SHIP.value
+        else:
+            return Textures.SEA.value
+        
+        
+class StatesOfGame:
+    def __init__(self):
+        self.state = GameStates.SHIPS_PLASE
+    
+    # def get_game_state(self):
+    #     if self.state==GameStates.GAME:     
+        
+        
+class Field_Seeble:
+    def __init__(self):
+        pass
+   
+    def generate_field_enemy(self):
+        field=[]
+        for _ in range(10):
+            in_field=[]
+            for _ in range(10):
+                in_field.append(FieldObg())
+            field.append(in_field)
+            
+        self.enemy_field_see=field
+        
+
+    def draw_enemy(self,screen):
+        x=Constants.SPASE_OF_SCREEN
+        for i in range(10):
+            y=Constants.SPASE_OF_SCREEN
+            for j in range(10):
+                screen.blit(self.enemy_field_see[i][j].texture_give(),(x,y))
+                y+=round(Constants.SIZE_PICTURE, -1)
+            x+=round(Constants.SIZE_PICTURE, -1)
+        return x+Constants.SPASE_OF_SCREEN*2
+
+    
+    def generate_field_my(self):
+        field=[]
+        for _ in range(10):
+            in_field=[]
+            for _ in range(10):
+                in_field.append(FieldObg())
+            field.append(in_field)
+            
+        self.my_field_see=field
+            
+    def draw_my(self,screen,x):
+        for i in range(10):
+            y=Constants.SPASE_OF_SCREEN
+            for j in range(10):
+                screen.blit(self.my_field_see[i][j].texture_give(),(x,y))
+                y+=round(Constants.SIZE_PICTURE, -1)
+            x+=round(Constants.SIZE_PICTURE, -1)
+            
+
+def get_ship_length(field, start_x, start_y):
+    queue = deque([(start_x, start_y)])
+    visited = {(start_x, start_y)}
+    while queue:
+        x, y = queue.popleft()
+        for dx in (-1, 0, 1):
+            for dy in (-1, 0, 1):
+                if abs(dx) + abs(dy) != 1:
+                    continue
+                next_x = x + dx
+                next_y = y + dy
+                if (next_x, next_y) in visited:
+                    continue
+                if field[next_x][next_y].is_ship:
+                    queue.append((next_x, next_y))
+                    visited.add((next_x, next_y))
+    return len(visited)
+            
+
+
+
+
+def valid_ship(field):
+    global ship_error
+    for row in range(10):
+        for col in range(10):
+            if field[row][col].is_ship:
+                len_ship=get_ship_length(field,row,col)
+                if len_ship>4:
+                    ship_error=True
+    
+        
+        
+def pixel_to_cordinates(x,y,my=False):
+    if my:
+        x-=Constants.SPASE_OF_SCREEN*3+round(Constants.SIZE_PICTURE, -1)*10
+    else:
+        x-=Constants.SPASE_OF_SCREEN
+    y-=Constants.SPASE_OF_SCREEN
+    x//=round(Constants.SIZE_PICTURE, -1)
+    y//=round(Constants.SIZE_PICTURE, -1)
+    if my:
+        return x,y
+    return x-10,y
+    
+
+
+
+field=Field_Seeble()
+game_state=StatesOfGame()
+ship_error=False
+
+field.generate_field_enemy()
+field.generate_field_my()
+
+
+def draw():
+    x=field.draw_enemy(screen)
+    field.draw_my(screen,x)
+    if ship_error:
+        screen.draw.text('ship error',(550,200),fontsize=74,color='white')
+    # screen.blit('sea',(0,0))
+
+    
+    
+def on_mouse_up(pos,button):
+    x,y=pos
+    if game_state.state==GameStates.SHIPS_PLASE:
+        # if 25<x<425 and 25<y<425:
+        #     clk_x,clk_y=pixel_to_cordinates(x,y)
+        #     field.enemy_field_see[clk_x][clk_y].un_or_plase_ship()
+        if 475<x<875 and 25<y<425:
+            clk_x,clk_y=pixel_to_cordinates(x,y,True)
+            field.my_field_see[clk_x][clk_y].un_or_plase_ship()
+            valid_ship(field.my_field_see)
+        
+
+
+
+
