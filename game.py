@@ -19,8 +19,10 @@ class Constants(IntEnum):
     
 class Textures(Enum):
     SEA=images.piese_sea
-    BURNING=images.burning
+    BURNING=images.ship_burning
     SHIP=images.ship
+    MENU_BACKFONE=images.menu_phone
+    LETS_GAME=images.game_button
 
     
 class FieldObg:
@@ -44,7 +46,7 @@ class FieldObg:
         
 class StatesOfGame:
     def __init__(self):
-        self.state = GameStates.SHIPS_PLASE
+        self.state = GameStates.MENU
     
     # def get_game_state(self):
     #     if self.state==GameStates.GAME:     
@@ -181,11 +183,9 @@ def valid_ship(field):
             len_ship,is_straight,ship_nearby=get_ship_length(field,row,col)
             if len_ship>4 or ship_nearby or not is_straight:
                 ship_error=True
-                
-                    
-    
-        
-        
+
+
+
 def pixel_to_cordinates(x,y,my=False):
     if my:
         x-=Constants.SPASE_OF_SCREEN*3+round(Constants.SIZE_PICTURE, -1)*10
@@ -199,7 +199,36 @@ def pixel_to_cordinates(x,y,my=False):
     return x-10,y
     
 
-
+def backfill(screen):
+    if game_state.state==GameStates.MENU:
+        screen.blit(Textures.MENU_BACKFONE.value,(0,0))
+        screen.blit(Textures.LETS_GAME.value,(300,150))
+    elif game_state.state==GameStates.SHIPS_PLASE or game_state.state==GameStates.GAME:
+        screen.blit('sea',(-200,-200))
+        x=field.draw_enemy(screen)
+        field.draw_my(screen,x)
+        screen.draw.text('my field',(630,440),fontsize=50)
+        screen.draw.text('enemy field',(130,440),fontsize=50)
+        if ready_to_game and not ship_error:
+            screen.blit(Textures.LETS_GAME.value,(100,150))
+        if game_state.state==GameStates.GAME:
+            screen.blit('insta_loose',(5,475))
+        
+def error(screen):
+    if game_state.state==GameStates.SHIPS_PLASE:
+        if ship_error:
+            screen.draw.text('ship error',(550,200),fontsize=74,color='white')
+        elif count_ship_error:
+            screen.draw.text('count ship error',(450,150),fontsize=74,color='white')
+    
+def check_ready_to_game(ships):
+    count_of_ship_blocks=0
+    for key,val in ships.items():
+        if abs(key+(-5))>=val:
+            count_of_ship_blocks+=key*val
+    return count_of_ship_blocks
+        
+    
 
 field=Field_Seeble()
 game_state=StatesOfGame()
@@ -207,23 +236,23 @@ ship_error=False
 count_ship_error=False
 field.generate_field_enemy()
 field.generate_field_my()
-
+ready_to_game=False
 
 def draw():
     screen.clear()
-    x=field.draw_enemy(screen)
-    field.draw_my(screen,x)
-    if ship_error:
-        screen.draw.text('ship error',(550,200),fontsize=74,color='white')
-    elif count_ship_error:
-        screen.draw.text('count ship error',(450,150),fontsize=74,color='white')
-    # screen.blit('sea',(0,0))
+    backfill(screen)
+    error(screen)
+
 
     
     
 def on_mouse_up(pos,button):
+    global ready_to_game
     x,y=pos
-    if game_state.state==GameStates.SHIPS_PLASE:
+    if game_state.state==GameStates.MENU:
+        if 300<=x<600 and 150<=y<302:
+            game_state.state=GameStates.SHIPS_PLASE
+    elif game_state.state==GameStates.SHIPS_PLASE:
         # if 25<x<425 and 25<y<425:
         #     clk_x,clk_y=pixel_to_cordinates(x,y)
         #     field.enemy_field_see[clk_x][clk_y].un_or_plase_ship()
@@ -231,7 +260,18 @@ def on_mouse_up(pos,button):
             clk_x,clk_y=pixel_to_cordinates(x,y,True)
             field.my_field_see[clk_x][clk_y].un_or_plase_ship()
             valid_ship(field.my_field_see)
-            valid_count_of_ship(field.my_field_see)
+            ships=valid_count_of_ship(field.my_field_see)
+            if check_ready_to_game(ships)==20:
+                ready_to_game=True
+                
+        if not ship_error and ready_to_game and 100<=x<400 and 150<=y<302:
+            ready_to_game=False
+            game_state.state=GameStates.GAME
+            
+    elif game_state.state==GameStates.GAME:
+        if 5<=x<63 and 475<=y<500:
+            game_state.state=GameStates.MENU
+                
         
 
 
