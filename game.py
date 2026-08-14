@@ -1,8 +1,7 @@
 from enum import IntEnum, Enum, auto
 from collections import deque, Counter
 from random import randint,choice
-from itertools import permutations
-
+from time import sleep
 HEIGHT = 500
 WIDTH = 900
 # одно поле равен ~38
@@ -243,6 +242,12 @@ def backfill(screen):
             screen.blit(Textures.LETS_GAME.value, (100, 150))
         if game_state.state == GameStates.GAME:
             screen.blit("insta_loose", (5, 475))
+    elif game_state.state == GameStates.VICTORY or game_state.state == GameStates.DEFEAT:
+        screen.fill((51, 204, 242))
+        if game_state.state == GameStates.VICTORY:
+            screen.draw.text('!VICTORY!',(350,200),fontsize=75,color='white')
+        elif game_state.state == GameStates.DEFEAT:
+            screen.draw.text('DEFEAT',(350,200),fontsize=75,color='red')
 
 
 def error(screen):
@@ -298,6 +303,50 @@ def plase_ships_enemy(field):
     return False
 
 
+def some_ones_turn(turn,field,x_clict,y_clict):
+    if turn:
+        if not field[x_clict][y_clict].is_shooten:
+            field[x_clict][y_clict].shoot()
+            if field[x_clict][y_clict].is_ship:
+                return turn
+            return not turn
+        return turn
+
+def ais_turn(field,gratest_next_move=False):
+    rx=randint(0,9)
+    ry=randint(0,9)
+    rotations=[(0,1),(1,0),(-1,0),(0,-1)]
+    while field[rx][ry].is_shooten:
+        rx=randint(0,9)
+        ry=randint(0,9)
+    next_move=True
+    if gratest_next_move:
+        x,y=gratest_next_move
+        field[x][y].shoot()
+        if field[x][y].is_ship:
+            next_move=False
+        for rot_x,rot_y in rotations:
+            next_x=x+rot_x
+            next_y=y+rot_y
+            if not (0<=next_x<10 and 0<=next_y<10):
+                continue
+            if field[next_x][next_y].is_ship and not field[next_x][next_y].is_shooten:
+                return (next_x,next_y),next_move
+        return False ,next_move
+    else:
+        field[rx][ry].shoot()
+        if field[rx][ry].is_ship:
+            next_move=False
+            return (rx,ry),next_move
+        return False,next_move
+        
+def check_los_or_vin(field):
+    for row in field:
+        for cord in row:
+            if cord.is_ship and not cord.is_shooten:
+                return False
+    return True
+        
 
 
 
@@ -312,7 +361,8 @@ while not wrong:
     field.generate_field_enemy()
     wrong=plase_ships_enemy(field)
 ready_to_game = False
-
+is_player_turn=True
+gratest_move=False
 
 def draw():
     screen.clear()
@@ -320,12 +370,30 @@ def draw():
     error(screen)
 
 
+def update():
+    global is_player_turn,gratest_move
+    if game_state.state == GameStates.GAME:
+        if not is_player_turn:
+            gratest_move,next_move=ais_turn(field.my_field_see,gratest_move)
+            if check_los_or_vin(field.my_field_see):
+                game_state.state = GameStates.DEFEAT
+            is_player_turn= next_move
+
+
+
 def on_mouse_up(pos, button):
-    global ready_to_game
+    global ready_to_game, is_player_turn, gratest_move
     x, y = pos
     if game_state.state == GameStates.MENU:
         if 300 <= x < 600 and 150 <= y < 302:
+            field.generate_field_enemy()
+            field.generate_field_my()
+            wrong=plase_ships_enemy(field)
+            while not wrong:
+                field.generate_field_enemy()
+                wrong=plase_ships_enemy(field)
             game_state.state = GameStates.SHIPS_PLASE
+            
     elif game_state.state == GameStates.SHIPS_PLASE:
         if 475 < x < 875 and 25 < y < 425:
             clk_x, clk_y = pixel_to_cordinates(x, y, True)
@@ -343,7 +411,14 @@ def on_mouse_up(pos, button):
         
         if 25<x<425 and 25<y<425:
             clk_x,clk_y=pixel_to_cordinates(x,y)
-            field.enemy_field_see[clk_x][clk_y].shoot()
+            is_player_turn=some_ones_turn(is_player_turn,field.enemy_field_see,clk_x,clk_y)
+            if check_los_or_vin(field.enemy_field_see):
+                game_state.state = GameStates.VICTORY
         
         if 5 <= x < 63 and 475 <= y < 500:
             game_state.state = GameStates.MENU
+    
+    elif game_state.state == GameStates.VICTORY or game_state.state == GameStates.DEFEAT:
+       if button:
+        game_state.state = GameStates.MENU
+
