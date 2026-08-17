@@ -4,6 +4,7 @@ from random import randint,choice
 from time import sleep
 HEIGHT = 500
 WIDTH = 900
+TITLE="Sea Buttle"
 # одно поле равен ~38
 
 
@@ -27,6 +28,7 @@ class Textures(Enum):
     MENU_BACKFONE = images.menu_phone
     LETS_GAME = images.game_button
     SHOOTEN_SEA=images.shooten
+    DESTROED=images.enemy_ship_shooten
 
 
 
@@ -38,6 +40,7 @@ class FieldObg:
         self.is_sea = True
         self.is_ship = False
         self.is_shooten = False
+        self.is_destoed=False
 
     def shoot(self):
         self.is_shooten = True
@@ -56,7 +59,9 @@ class FieldObg:
 
         
     def texture_give(self):
-        if self.is_shooten and self.is_ship:
+        if self.is_destoed:
+            return Textures.DESTROED.value
+        elif self.is_shooten and self.is_ship:
             return Textures.BURNING.value
         elif self.is_shooten and not self.is_ship:
             return Textures.SHOOTEN_SEA.value
@@ -99,13 +104,42 @@ class Field_Seeble:
         return x + Constants.SPASE_OF_SCREEN * 2
 
     def generate_field_my(self):
+        
+        def fill_test(field):
+            test_data = [
+                (1,1),
+                (1,2),
+                (1,3),
+                (1,4),
+                (4,2),
+                (4,3),
+                (4,4),
+                (7,1),
+                (7,2),
+                (7,3),
+                (1,9),
+                (2,9),
+                (1,7),
+                (2,7),
+                (9,9),
+                (9,0),
+                (5,9),
+                (7,9),
+                (6,6),
+                (5,8),
+                
+            ]
+            
+            for x, y in test_data:
+                field[x][y].is_ship = True
+                
         field = []
         for _ in range(10):
             in_field = []
             for _ in range(10):
                 in_field.append(FieldObg(True))
             field.append(in_field)
-
+        #fill_test(field)
         self.my_field_see = field
 
     def draw_my(self, screen, x):
@@ -243,7 +277,10 @@ def backfill(screen):
         if game_state.state == GameStates.GAME:
             screen.blit("insta_loose", (5, 475))
     elif game_state.state == GameStates.VICTORY or game_state.state == GameStates.DEFEAT:
-        screen.fill((51, 204, 242))
+        screen.blit("sea", (-200, -200))
+        x = field.draw_enemy(screen)
+        field.draw_my(screen, x)
+        # screen.fill((51, 204, 242))
         if game_state.state == GameStates.VICTORY:
             screen.draw.text('!VICTORY!',(350,200),fontsize=75,color='white')
         elif game_state.state == GameStates.DEFEAT:
@@ -307,38 +344,53 @@ def some_ones_turn(turn,field,x_clict,y_clict):
     if turn:
         if not field[x_clict][y_clict].is_shooten:
             field[x_clict][y_clict].shoot()
+            is_ship_died(x_clict,y_clict,field)
             if field[x_clict][y_clict].is_ship:
                 return turn
             return not turn
         return turn
 
-def ais_turn(field,gratest_next_move=False):
+
+def ais_turn(board,gratest_next_move=False):
     rx=randint(0,9)
     ry=randint(0,9)
     rotations=[(0,1),(1,0),(-1,0),(0,-1)]
-    while field[rx][ry].is_shooten:
+    gratest_move=False
+    while board[rx][ry].is_shooten:
         rx=randint(0,9)
         ry=randint(0,9)
     next_move=True
     if gratest_next_move:
-        x,y=gratest_next_move
-        field[x][y].shoot()
-        if field[x][y].is_ship:
+        rx,ry=gratest_next_move
+        board[rx][ry].shoot()
+        if board[rx][ry].is_ship:
             next_move=False
         for rot_x,rot_y in rotations:
-            next_x=x+rot_x
-            next_y=y+rot_y
+            next_x=rx+rot_x
+            next_y=ry+rot_y
             if not (0<=next_x<10 and 0<=next_y<10):
                 continue
-            if field[next_x][next_y].is_ship and not field[next_x][next_y].is_shooten:
-                return (next_x,next_y),next_move
-        return False ,next_move
+            if board[next_x][next_y].is_ship and not board[next_x][next_y].is_shooten:
+                gratest_move=(next_x,next_y)
+            # else:
+            #     gratest_move=False
     else:
-        field[rx][ry].shoot()
-        if field[rx][ry].is_ship:
+        while (rx, ry) in near_ship_ai or board[rx][ry].is_shooten:
+            rx=randint(0,9)
+            ry=randint(0,9)
+                    
+        board[rx][ry].shoot()
+        if board[rx][ry].is_ship:
             next_move=False
-            return (rx,ry),next_move
-        return False,next_move
+            gratest_move=(rx,ry)
+        else:
+            gratest_move=False
+    
+    check=is_ship_died(rx,ry,field.my_field_see)
+    if check:
+        near_ship_ai.update(do_step_on(check))
+    return gratest_move,next_move
+
         
 def check_los_or_vin(field):
     for row in field:
@@ -348,7 +400,52 @@ def check_los_or_vin(field):
     return True
         
 
-
+def is_ship_died(x,y,field):
+    deq=deque([(x,y)])
+    viuved=set([(x,y)])
+    count_of_sooten=0
+    if not field[x][y].is_ship:
+        return False
+    while deq:
+        x,y = deq.popleft()
+        for dx in (-1, 0, 1):
+            for dy in (-1, 0, 1):
+                if abs(dx) + abs(dy) != 1:
+                    continue
+                next_x = x + dx
+                next_y = y + dy
+                if not (0 <= next_x < len(field) and 0 <= next_y < len(field[next_x])):
+                    continue
+                if (next_x, next_y) in viuved:
+                    continue
+                if field[next_x][next_y].is_shooten and field[next_x][next_y].is_ship:
+                    count_of_sooten+=1
+                if field[next_x][next_y].is_ship:
+                    deq.append((next_x, next_y))
+                    viuved.add((next_x, next_y))
+                
+    if len(viuved)==count_of_sooten+1:
+        for x,y in viuved:
+            field[x][y].is_destoed=True
+        return viuved
+    return False
+    
+    
+def do_step_on(ship):
+    not_choose_this=set()
+    for x,y in ship:
+        for dx in (-1, 0, 1):
+            for dy in (-1, 0, 1):
+                next_x = x + dx
+                next_y = y + dy
+                if not (0 <= next_x < len(field.my_field_see) and 0 <= next_y < len(field.my_field_see[next_x])):
+                    continue
+                if (next_x, next_y) in ship:
+                    continue
+                not_choose_this.add((next_x, next_y))
+    return not_choose_this
+    
+    
 
 field = Field_Seeble()
 game_state = StatesOfGame()
@@ -363,6 +460,7 @@ while not wrong:
 ready_to_game = False
 is_player_turn=True
 gratest_move=False
+near_ship_ai=set()
 
 def draw():
     screen.clear()
@@ -382,9 +480,10 @@ def update():
 
 
 def on_mouse_up(pos, button):
-    global ready_to_game, is_player_turn, gratest_move
+    global ready_to_game, is_player_turn, gratest_move,near_ship_ai
     x, y = pos
     if game_state.state == GameStates.MENU:
+        near_ship_ai=set()
         if 300 <= x < 600 and 150 <= y < 302:
             field.generate_field_enemy()
             field.generate_field_my()
@@ -419,6 +518,6 @@ def on_mouse_up(pos, button):
             game_state.state = GameStates.MENU
     
     elif game_state.state == GameStates.VICTORY or game_state.state == GameStates.DEFEAT:
-       if button:
-        game_state.state = GameStates.MENU
+        if button:
+            game_state.state = GameStates.MENU
 
