@@ -3,8 +3,8 @@ from enum import IntEnum, Enum, auto
 
 class Textures(Enum):
     SEA = "piese_sea"
-    BURNING = "ship_burning"
-    SHIP = "ship"
+    BURNING = "ship_from_abdo_burn"
+    SHIP = "ship_from_abdo"
     MENU_BACKFONE = "menu_phone"
     LETS_GAME = "game_button"
     SHOOTEN_SEA = "shooten"
