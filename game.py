@@ -47,11 +47,9 @@ class Cell:
                         return Textures.SHOOTEN_SEA.value
                 
             case CellContent.SHIP:
-                if see_ship:
-                    return Textures.SHIP.value
                 match self.shot_state:
                     case ShotState.NOT_SHOT:
-                        if self.is_player:
+                        if self.is_player or see_ship:
                             return Textures.SHIP.value
                         return Textures.SEA.value
                     case ShotState.HIT:
@@ -64,6 +62,50 @@ class StatesOfGame:
     def __init__(self):
         self.state = GameStates.MENU
 
+    def state_MENU(self):
+        game.near_ship_ai = set()
+        game.is_player_turn = True
+        if 300 <= game.x < 600 and 150 <= game.y < 302:
+            game.field.generate_field_enemy()
+            game.field.generate_field_my()
+            wrong = place_ships_enemy(game.field.enemy_field_see)
+            game.ai = Ais_Turns(game.field.my_field_see)
+            while not wrong:
+                game.field.generate_field_enemy()
+                wrong = place_ships_enemy(game.field.enemy_field_see)
+            game.game_state.state = GameStates.SHIPS_place
+
+    def state_SHIPS_place(self):
+        if 475 < game.x < 875 and 25 < game.y < 425:
+            clk_x, clk_y = pixel_to_cordinates(game.x, game.y, True)
+            game.field.my_field_see[clk_x][clk_y].un_or_place_ship()
+            valid_ship(game.field.my_field_see)
+            ships = valid_count_of_ship(game.field.my_field_see)
+            if check_ready_to_game(ships) == 20:
+                game.ready_to_game = True
+            else:
+                game.ready_to_game = False
+                
+        if not game.ship_error and game.ready_to_game and 100 <= game.x < 400 and 150 <= game.y < 302:
+            game.ready_to_game = False
+            game.game_state.state = GameStates.GAME
+
+    def state_GAME(self):
+        if 25 < game.x < 425 and 25 < game.y < 425:
+            clk_x, clk_y = pixel_to_cordinates(game.x, game.y)
+            game.is_player_turn = players_ones_turn(
+                game.is_player_turn, game.field.enemy_field_see, clk_x, clk_y
+            )
+            if check_los_or_vin(game.field.enemy_field_see):
+                game.game_state.state = GameStates.VICTORY
+
+        if 5 <= game.x < 63 and 475 <= game.y < 500:
+            game.game_state.state = GameStates.MENU
+        
+    def state_VIN_LOS(self):
+        if game.button:
+            game.game_state.state = GameStates.MENU
+
 
 class Field_Seeble:
     def __init__(self):
@@ -74,7 +116,7 @@ class Field_Seeble:
         for _ in range(Constants.SIZE_BOARD):
             in_field = []
             for _ in range(Constants.SIZE_BOARD):
-                in_field.append(Cell(True))
+                in_field.append(Cell())
             field.append(in_field)
 
         self.enemy_field_see = field
@@ -251,6 +293,11 @@ class Game:
         self.ready_to_game = False
         self.is_player_turn = True
         self.gratest_move = False
+
+    def xy_but_set(self,x,y,button):
+        self.x=x
+        self.y=y
+        self.button=button
 
 
 def get_ship_length(field, start_x, start_y):
@@ -584,49 +631,16 @@ def update():
 
 def on_mouse_up(pos, button):
     x, y = pos
-    if game.game_state.state == GameStates.MENU:
-        game.near_ship_ai = set()
-        game.is_player_turn = True
-        if 300 <= x < 600 and 150 <= y < 302:
-            game.field.generate_field_enemy()
-            game.field.generate_field_my()
-            wrong = place_ships_enemy(game.field.enemy_field_see)
-            game.ai = Ais_Turns(game.field.my_field_see)
-            while not wrong:
-                game.field.generate_field_enemy()
-                wrong = place_ships_enemy(game.field.enemy_field_see)
-            game.game_state.state = GameStates.SHIPS_place
+    game.xy_but_set(x,y,button)
+    match game.game_state.state:
+        case GameStates.MENU:
+            game.game_state.state_MENU()
 
-    elif game.game_state.state == GameStates.SHIPS_place:
-        if 475 < x < 875 and 25 < y < 425:
-            clk_x, clk_y = pixel_to_cordinates(x, y, True)
-            game.field.my_field_see[clk_x][clk_y].un_or_place_ship()
-            valid_ship(game.field.my_field_see)
-            ships = valid_count_of_ship(game.field.my_field_see)
-            if check_ready_to_game(ships) == 20:
-                game.ready_to_game = True
-            else:
-                game.ready_to_game = False
+        case GameStates.SHIPS_place:
+            game.game_state.state_SHIPS_place()
 
-        if not game.ship_error and game.ready_to_game and 100 <= x < 400 and 150 <= y < 302:
-            game.ready_to_game = False
-            game.game_state.state = GameStates.GAME
+        case GameStates.GAME:
+            game.game_state.state_GAME()
 
-    elif game.game_state.state == GameStates.GAME:
-
-        if 25 < x < 425 and 25 < y < 425:
-            clk_x, clk_y = pixel_to_cordinates(x, y)
-            game.is_player_turn = players_ones_turn(
-                game.is_player_turn, game.field.enemy_field_see, clk_x, clk_y
-            )
-            if check_los_or_vin(game.field.enemy_field_see):
-                game.game_state.state = GameStates.VICTORY
-
-        if 5 <= x < 63 and 475 <= y < 500:
-            game.game_state.state = GameStates.MENU
-
-    elif (
-        game.game_state.state == GameStates.VICTORY or game.game_state.state == GameStates.DEFEAT
-    ):
-        if button:
-            game.game_state.state = GameStates.MENU
+        case GameStates.VICTORY | GameStates.DEFEAT:
+            game.game_state.state_VIN_LOS()
