@@ -48,7 +48,7 @@ class Cell:
 
 class StatesOfGame:
     def __init__(self):
-        self.state = GameStates.GAME
+        self.state = GameStates.MENU
 
 
 class Field_Seeble:
@@ -131,9 +131,8 @@ class Ais_Turns:
         self.current_direction=None
         self.mode=AiModes.SEARCH
         self.visited_dontmovehere=set()
-        
+
     def move(self):
-        print(self.visited_dontmovehere)
         next_move = True
         #logic block
         if self.mode==AiModes.SEARCH:
@@ -222,11 +221,19 @@ class Ais_Turns:
 
             
         #logic block
-        
-        
-        
-        
 
+
+class Game:
+    def __init__(self):
+        self.field = Field_Seeble()
+        self.game_state = StatesOfGame()
+        self.field.generate_field_my()
+        self.ai = Ais_Turns(self.field.my_field_see)
+        self.ship_error = False
+        self.count_ship_error = False
+        self.ready_to_game = False
+        self.is_player_turn = True
+        self.gratest_move = False
 
 
 def get_ship_length(field, start_x, start_y):
@@ -267,11 +274,10 @@ def get_ship_length(field, start_x, start_y):
 
 
 def valid_count_of_ship(field):
-    global count_ship_error
     counter = Counter({1: 0, 2: 0, 3: 0, 4: 0})
     all_visited = set()
     visited = set()
-    count_ship_error = False
+    game.count_ship_error = False
     eczample = Counter({1: 4, 2: 3, 3: 2, 4: 1})
     for i in range(Constants.SIZE_BOARD):
         for j in range(Constants.SIZE_BOARD):
@@ -307,7 +313,7 @@ def valid_count_of_ship(field):
                 or counter[3] > eczample[3]
                 or counter[4] > eczample[4]
             ):
-                count_ship_error = True
+                game.count_ship_error = True
                 return counter
     return counter
 
@@ -352,15 +358,14 @@ def is_ship_died(x, y, field, is_for_player=False):
 
 
 def valid_ship(field):
-    global ship_error
-    ship_error = False
+    game.ship_error = False
     for row in range(Constants.SIZE_BOARD):
         for col in range(Constants.SIZE_BOARD):
             if not field[row][col].is_ship:
                 continue
             len_ship, is_straight, ship_nearby = get_ship_length(field, row, col)
             if len_ship > 4 or ship_nearby or not is_straight:
-                ship_error = True
+                game.ship_error = True
 
 
 def count_of_non_shooten(x,y,field):
@@ -409,40 +414,40 @@ def pixel_to_cordinates(x, y, my=False):
 
 
 def backfill(screen):
-    if game_state.state == GameStates.MENU:
+    if game.game_state.state == GameStates.MENU:
         screen.blit(Textures.MENU_BACKFONE.value, (0, 0))
         screen.blit(Textures.LETS_GAME.value, (300, 150))
     elif (
-        game_state.state == GameStates.SHIPS_place
-        or game_state.state == GameStates.GAME
+        game.game_state.state == GameStates.SHIPS_place
+        or game.game_state.state == GameStates.GAME
     ):
         screen.blit("sea", (-200, -200))
-        x = field.draw_enemy(screen)
-        field.draw_my(screen, x)
+        x = game.field.draw_enemy(screen)
+        game.field.draw_my(screen, x)
         screen.draw.text("my field", (630, 440), fontsize=50)
         screen.draw.text("enemy field", (130, 440), fontsize=50)
-        if ready_to_game and not ship_error:
+        if game.ready_to_game and not game.ship_error:
             screen.blit(Textures.LETS_GAME.value, (100, 150))
-        if game_state.state == GameStates.GAME:
+        if game.game_state.state == GameStates.GAME:
             screen.blit("insta_loose", (5, 475))
     elif (
-        game_state.state == GameStates.VICTORY or game_state.state == GameStates.DEFEAT
+        game.game_state.state == GameStates.VICTORY or game.game_state.state == GameStates.DEFEAT
     ):
         screen.blit("sea", (-200, -200))
-        x = field.draw_enemy(screen, True)
-        field.draw_my(screen, x)
+        x = game.field.draw_enemy(screen, True)
+        game.field.draw_my(screen, x)
         # screen.fill((51, 204, 242))
-        if game_state.state == GameStates.VICTORY:
+        if game.game_state.state == GameStates.VICTORY:
             screen.draw.text("!VICTORY!", (350, 200), fontsize=75, color="white")
-        elif game_state.state == GameStates.DEFEAT:
+        elif game.game_state.state == GameStates.DEFEAT:
             screen.draw.text("DEFEAT", (350, 200), fontsize=75, color="red")
 
 
 def error(screen):
-    if game_state.state == GameStates.SHIPS_place:
-        if ship_error:
+    if game.game_state.state == GameStates.SHIPS_place:
+        if game.ship_error:
             screen.draw.text("ship error", (550, 200), fontsize=74, color="white")
-        elif count_ship_error:
+        elif game.count_ship_error:
             screen.draw.text("count ship error", (450, 150), fontsize=74, color="white")
 
 
@@ -491,12 +496,12 @@ def place_ships_enemy(field):
                             and 0 <= next_y < Constants.SIZE_BOARD
                         ):
                             continue
-                        if field.enemy_field_see[next_x][next_y].is_ship:
+                        if field[next_x][next_y].is_ship:
                             can_place = False
             if not can_place:
                 continue
             for x, y in ship_cells:
-                field.enemy_field_see[x][y].place_ship()
+                field[x][y].place_ship()
             placed = True
             break
     if placed:
@@ -508,7 +513,7 @@ def players_ones_turn(turn, board, x_clict, y_clict):
     if turn:
         if not board[x_clict][y_clict].is_shooten:
             board[x_clict][y_clict].shoot()
-            is_ship_died(x_clict, y_clict, field.enemy_field_see, True)
+            is_ship_died(x_clict, y_clict, game.field.enemy_field_see, True)
             # ultimate_ship_chec_func(x_clict, y_clict, field.enemy_field_see, SelectMode.IS_SHIP_DIED, is_players_board=True)
             if board[x_clict][y_clict].is_ship:
                 return turn
@@ -520,7 +525,7 @@ def ais_turn(board, gratest_next_move=False):
     rx = randint(0, 9)
     ry = randint(0, 9)
     rotations = [(0, 1), (1, 0), (-1, 0), (0, -1)]
-    gratest_move = False
+    game.gratest_move = False
     while board[rx][ry].is_shooten:
         rx = randint(0, 9)
         ry = randint(0, 9)
@@ -539,25 +544,23 @@ def ais_turn(board, gratest_next_move=False):
             ):
                 continue
             if board[next_x][next_y].is_ship and not board[next_x][next_y].is_shooten:
-                gratest_move = (next_x, next_y)
-            # else:
-            #     gratest_move=False
+                game.gratest_move = (next_x, next_y)
     else:
-        while (rx, ry) in near_ship_ai or board[rx][ry].is_shooten:
+        while (rx, ry) in game.near_ship_ai or board[rx][ry].is_shooten:
             rx = randint(0, 9)
             ry = randint(0, 9)
 
         board[rx][ry].shoot()
         if board[rx][ry].is_ship:
             next_move = False
-            gratest_move = (rx, ry)
+            game.gratest_move = (rx, ry)
         else:
-            gratest_move = False
+            game.gratest_move = False
 
-    check = is_ship_died(rx, ry, field.my_field_see)
+    check = is_ship_died(rx, ry, game.field.my_field_see)
     if check:
-        near_ship_ai.update(do_step_on(check))
-    return gratest_move, next_move
+        game.near_ship_ai.update(do_step_on(check))
+    return game.gratest_move, next_move
 
 
 def check_los_or_vin(field):
@@ -576,8 +579,8 @@ def do_step_on(ship):
                 next_x = x + dx
                 next_y = y + dy
                 if not (
-                    0 <= next_x < len(field.my_field_see)
-                    and 0 <= next_y < len(field.my_field_see[next_x])
+                    0 <= next_x < len(game.field.my_field_see)
+                    and 0 <= next_y < len(game.field.my_field_see[next_x])
                 ):
                     continue
                 if (next_x, next_y) in ship:
@@ -586,20 +589,7 @@ def do_step_on(ship):
     return not_choose_this
 
 
-field = Field_Seeble()
-game_state = StatesOfGame()
-ship_error = False
-count_ship_error = False
-field.generate_field_enemy()
-field.generate_field_my()
-wrong = place_ships_enemy(field)
-while not wrong:
-    field.generate_field_enemy()
-    wrong = place_ships_enemy(field)
-ready_to_game = False
-is_player_turn = True
-gratest_move = False
-ai = Ais_Turns(field.my_field_see)
+game=Game()
 
 
 def draw():
@@ -609,61 +599,59 @@ def draw():
 
 
 def update():
-    global is_player_turn
-    if game_state.state == GameStates.GAME:
-        if not is_player_turn:
-            next_move = ai.move()
-            if check_los_or_vin(field.my_field_see):
-                game_state.state = GameStates.DEFEAT
-            is_player_turn = next_move
+    if game.game_state.state == GameStates.GAME:
+        if not game.is_player_turn:
+            next_move = game.ai.move()
+            if check_los_or_vin(game.field.my_field_see):
+                game.game_state.state = GameStates.DEFEAT
+            game.is_player_turn = next_move
 
 
 def on_mouse_up(pos, button):
-    global ready_to_game, is_player_turn, near_ship_ai, is_player_turn,ai
     x, y = pos
-    if game_state.state == GameStates.MENU:
-        near_ship_ai = set()
-        is_player_turn = True
+    if game.game_state.state == GameStates.MENU:
+        game.near_ship_ai = set()
+        game.is_player_turn = True
         if 300 <= x < 600 and 150 <= y < 302:
-            field.generate_field_enemy()
-            field.generate_field_my()
-            wrong = place_ships_enemy(field)
-            ai = Ais_Turns(field.my_field_see)
+            game.field.generate_field_enemy()
+            game.field.generate_field_my()
+            wrong = place_ships_enemy(game.field.enemy_field_see)
+            game.ai = Ais_Turns(game.field.my_field_see)
             while not wrong:
-                field.generate_field_enemy()
-                wrong = place_ships_enemy(field)
-            game_state.state = GameStates.SHIPS_place
+                game.field.generate_field_enemy()
+                wrong = place_ships_enemy(game.field.enemy_field_see)
+            game.game_state.state = GameStates.SHIPS_place
 
-    elif game_state.state == GameStates.SHIPS_place:
+    elif game.game_state.state == GameStates.SHIPS_place:
         if 475 < x < 875 and 25 < y < 425:
             clk_x, clk_y = pixel_to_cordinates(x, y, True)
-            field.my_field_see[clk_x][clk_y].un_or_place_ship()
-            valid_ship(field.my_field_see)
-            ships = valid_count_of_ship(field.my_field_see)
+            game.field.my_field_see[clk_x][clk_y].un_or_place_ship()
+            valid_ship(game.field.my_field_see)
+            ships = valid_count_of_ship(game.field.my_field_see)
             if check_ready_to_game(ships) == 20:
-                ready_to_game = True
+                game.ready_to_game = True
             else:
-                ready_to_game = False
+                game.ready_to_game = False
 
-        if not ship_error and ready_to_game and 100 <= x < 400 and 150 <= y < 302:
-            ready_to_game = False
-            game_state.state = GameStates.GAME
+        if not game.ship_error and game.ready_to_game and 100 <= x < 400 and 150 <= y < 302:
+            game.ready_to_game = False
+            game.game_state.state = GameStates.GAME
 
-    elif game_state.state == GameStates.GAME:
+    elif game.game_state.state == GameStates.GAME:
 
         if 25 < x < 425 and 25 < y < 425:
             clk_x, clk_y = pixel_to_cordinates(x, y)
-            is_player_turn = players_ones_turn(
-                is_player_turn, field.enemy_field_see, clk_x, clk_y
+            game.is_player_turn = players_ones_turn(
+                game.is_player_turn, game.field.enemy_field_see, clk_x, clk_y
             )
-            if check_los_or_vin(field.enemy_field_see):
-                game_state.state = GameStates.VICTORY
+            if check_los_or_vin(game.field.enemy_field_see):
+                game.game_state.state = GameStates.VICTORY
 
         if 5 <= x < 63 and 475 <= y < 500:
-            game_state.state = GameStates.MENU
+            game.game_state.state = GameStates.MENU
 
     elif (
-        game_state.state == GameStates.VICTORY or game_state.state == GameStates.DEFEAT
+        game.game_state.state == GameStates.VICTORY or game.game_state.state == GameStates.DEFEAT
     ):
         if button:
-            game_state.state = GameStates.MENU
+            game.game_state.state = GameStates.MENU

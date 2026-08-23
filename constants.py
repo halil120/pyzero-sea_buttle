@@ -33,3 +33,14 @@ class AiModes(Enum):
 class Directions(Enum):
     UP_DOUN=auto()
     LEFT_RIGHT=auto()
+    
+    
+class CellContent(Enum):
+    WATER=auto()
+    SHIP=auto()
+    
+    
+class ShotState(Enum):
+    NOT_SHOT=auto()
+    MISS=auto()
+    HIT=auto()
