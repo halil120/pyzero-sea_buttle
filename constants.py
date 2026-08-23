@@ -26,21 +26,22 @@ class Constants(IntEnum):
 
 
 class AiModes(Enum):
-    SEARCH=auto()
-    HUNTING=auto()
-    
+    SEARCH = auto()
+    HUNTING = auto()
+
 
 class Directions(Enum):
-    UP_DOUN=auto()
-    LEFT_RIGHT=auto()
-    
-    
+    UP_DOUN = auto()
+    LEFT_RIGHT = auto()
+
+
 class CellContent(Enum):
-    WATER=auto()
-    SHIP=auto()
-    
-    
+    WATER = auto()
+    SHIP = auto()
+
+
 class ShotState(Enum):
-    NOT_SHOT=auto()
-    MISS=auto()
-    HIT=auto()
+    NOT_SHOT = auto()
+    MISS = auto()
+    HIT = auto()
+    DESTROED = auto()

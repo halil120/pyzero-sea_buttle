@@ -1,6 +1,6 @@
 from collections import deque, Counter
 from random import randint, choice ,shuffle
-from constants import Textures, Constants, GameStates,AiModes,Directions
+from constants import Textures, Constants, GameStates,AiModes,Directions,ShotState,CellContent
 
 from testing import *
 
@@ -13,37 +13,51 @@ TITLE = "Sea Buttle"
 class Cell:
     def __init__(self, is_player=False):
         self.is_player = is_player
-        self.is_sea = True
-        self.is_ship = False
-        self.is_shooten = False
-        self.is_destoed = False
+        self.content=CellContent.WATER
+        self.shot_state=ShotState.NOT_SHOT
 
     def shoot(self):
-        self.is_shooten = True
+        match self.content:
+            case CellContent.WATER:
+                self.shot_state=ShotState.MISS
+            case CellContent.SHIP:
+                if not self.shot_state==ShotState.DESTROED:
+                    self.shot_state=ShotState.HIT
 
     def un_or_place_ship(self):
-        self.is_ship = not self.is_ship
-        self.is_sea = not self.is_sea
+        match self.content:
+            case CellContent.WATER:
+                self.content=CellContent.SHIP
+            case CellContent.SHIP:
+                self.content=CellContent.WATER
 
     def place_ship(self):
-        self.is_ship = True
-        self.is_sea = False
+        self.content=CellContent.SHIP
 
     def un_place_ship(self):
-        self.is_ship = False
-        self.is_sea = True
+        self.content=CellContent.WATER
 
     def texture_give(self, see_ship=False):
-        if self.is_destoed:
-            return Textures.DESTROED.value
-        elif self.is_shooten and self.is_ship:
-            return Textures.BURNING.value
-        elif self.is_shooten and not self.is_ship:
-            return Textures.SHOOTEN_SEA.value
-        elif self.is_ship and (see_ship or self.is_player):
-            return Textures.SHIP.value
-        else:
-            return Textures.SEA.value
+        match self.content:
+            case CellContent.WATER:
+                match self.shot_state:
+                    case ShotState.NOT_SHOT:
+                        return Textures.SEA.value
+                    case ShotState.MISS:
+                        return Textures.SHOOTEN_SEA.value
+                
+            case CellContent.SHIP:
+                if see_ship:
+                    return Textures.SHIP.value
+                match self.shot_state:
+                    case ShotState.NOT_SHOT:
+                        if self.is_player:
+                            return Textures.SHIP.value
+                        return Textures.SEA.value
+                    case ShotState.HIT:
+                        return Textures.BURNING.value
+                    case ShotState.DESTROED:
+                        return Textures.DESTROED.value
 
 
 class StatesOfGame:
@@ -138,14 +152,14 @@ class Ais_Turns:
         if self.mode==AiModes.SEARCH:
             x = randint(0, 9)
             y = randint(0, 9)
-            while self.board[x][y].is_shooten or (x,y) in self.visited_dontmovehere:
+            while not self.board[x][y].shot_state==ShotState.NOT_SHOT or (x,y) in self.visited_dontmovehere:
                 x = randint(0, 9)
                 y = randint(0, 9)
                 
             self.board[x][y].shoot()
-            if self.board[x][y].is_sea:
+            if self.board[x][y].content==CellContent.WATER:
                 next_move = True
-            elif self.board[x][y].is_ship:
+            elif self.board[x][y].content==CellContent.SHIP:
                 if self.reset(x,y):
                     return False
                 self.mode = AiModes.HUNTING
@@ -157,6 +171,7 @@ class Ais_Turns:
         elif self.mode==AiModes.HUNTING:
             if not self.target_cells:
                 self.mode=AiModes.SEARCH
+                self.hit_cells.clear()
                 return True
             while self.target_cells:
                 x,y=choice(list(self.target_cells))
@@ -165,13 +180,13 @@ class Ais_Turns:
                     continue
                 if not (0 <= x < Constants.SIZE_BOARD and 0 <= y < Constants.SIZE_BOARD):
                     continue
-                if self.board[x][y].is_shooten:
+                if not self.board[x][y].shot_state==ShotState.NOT_SHOT:
                     continue
                 self.board[x][y].shoot()
-                if not self.board[x][y].is_ship:
+                if not self.board[x][y].content==CellContent.SHIP:
                     next_move = True
                     return next_move
-                elif self.board[x][y].is_ship:
+                elif self.board[x][y].content==CellContent.SHIP:
                     if self.reset(x,y):
                         return False
                     all_x = {x for x, y in self.hit_cells}
@@ -185,7 +200,7 @@ class Ais_Turns:
                                 ty=tar_y+rot_y
                                 if not (0 <= tx < Constants.SIZE_BOARD and 0 <= ty < Constants.SIZE_BOARD):
                                     continue
-                                if self.board[tx][ty].is_shooten:
+                                if not self.board[tx][ty].shot_state==ShotState.NOT_SHOT:
                                     continue
                                 self.target_cells.add((tx,ty))
                         self.current_direction=Directions.LEFT_RIGHT
@@ -197,7 +212,7 @@ class Ais_Turns:
                                 ty=tar_y+rot_y
                                 if not (0 <= tx < Constants.SIZE_BOARD and 0 <= ty < Constants.SIZE_BOARD):
                                     continue
-                                if self.board[tx][ty].is_shooten:
+                                if not self.board[tx][ty].shot_state==ShotState.NOT_SHOT:
                                     continue
                                 self.target_cells.add((tx,ty))
                         self.current_direction=Directions.UP_DOUN
@@ -211,6 +226,8 @@ class Ais_Turns:
         self.hit_cells.add((x, y))
         ship_cells = count_of_non_shooten(x, y, self.board)
         if self.hit_cells == ship_cells:
+            for x,y in self.hit_cells:
+                self.board[x][y].shot_state=ShotState.DESTROED
             self.visited_dontmovehere.update(do_step_on(ship_cells))
             self.hit_cells.clear()
             self.target_cells.clear()
@@ -251,7 +268,7 @@ def get_ship_length(field, start_x, start_y):
                     continue
                 if (next_x, next_y) in visited:
                     continue
-                if field[next_x][next_y].is_ship:
+                if field[next_x][next_y].content==CellContent.SHIP:
                     queue.append((next_x, next_y))
                     visited.add((next_x, next_y))
 
@@ -265,7 +282,7 @@ def get_ship_length(field, start_x, start_y):
                 next_y = y + dy
                 if not (0 <= next_x < len(field) and 0 <= next_y < len(field[next_x])):
                     continue
-                if (next_x, next_y) not in visited and field[next_x][next_y].is_ship:
+                if (next_x, next_y) not in visited and field[next_x][next_y].content==CellContent.SHIP:
                     ship_nearby = True
     all_x = {x for x, y in visited}
     all_y = {y for x, y in visited}
@@ -281,7 +298,7 @@ def valid_count_of_ship(field):
     eczample = Counter({1: 4, 2: 3, 3: 2, 4: 1})
     for i in range(Constants.SIZE_BOARD):
         for j in range(Constants.SIZE_BOARD):
-            if not field[i][j].is_ship:
+            if not field[i][j].content==CellContent.SHIP:
                 continue
             if (i, j) in visited or (i, j) in all_visited:
                 continue
@@ -302,7 +319,7 @@ def valid_count_of_ship(field):
                             continue
                         if (next_x, next_y) in visited:
                             continue
-                        if field[next_x][next_y].is_ship:
+                        if field[next_x][next_y].content==CellContent.SHIP:
                             queue.append((next_x, next_y))
                             visited.add((next_x, next_y))
                             all_visited.add((next_x, next_y))
@@ -322,7 +339,7 @@ def is_ship_died(x, y, field, is_for_player=False):
     deq = deque([(x, y)])
     viuved = set([(x, y)])
     count_of_sooten = 0
-    if not field[x][y].is_ship:
+    if not field[x][y].content==CellContent.SHIP:
         return False
     while deq:
         x, y = deq.popleft()
@@ -344,15 +361,15 @@ def is_ship_died(x, y, field, is_for_player=False):
                     continue
                 if (next_x, next_y) in viuved:
                     continue
-                if field[next_x][next_y].is_shooten and field[next_x][next_y].is_ship:
+                if field[next_x][next_y].shot_state==ShotState.HIT and field[next_x][next_y].content==CellContent.SHIP:
                     count_of_sooten += 1
-                if field[next_x][next_y].is_ship:
+                if field[next_x][next_y].content==CellContent.SHIP:
                     deq.append((next_x, next_y))
                     viuved.add((next_x, next_y))
 
     if len(viuved) == count_of_sooten + 1:
         for x, y in viuved:
-            field[x][y].is_destoed = True
+            field[x][y].shot_state=ShotState.DESTROED
         return viuved
     return False
 
@@ -361,7 +378,7 @@ def valid_ship(field):
     game.ship_error = False
     for row in range(Constants.SIZE_BOARD):
         for col in range(Constants.SIZE_BOARD):
-            if not field[row][col].is_ship:
+            if not field[row][col].content==CellContent.SHIP:
                 continue
             len_ship, is_straight, ship_nearby = get_ship_length(field, row, col)
             if len_ship > 4 or ship_nearby or not is_straight:
@@ -372,7 +389,7 @@ def count_of_non_shooten(x,y,field):
     deq = deque([(x, y)])
     viuved = set([(x, y)])
     count_of_sooten = 0
-    if not field[x][y].is_ship:
+    if field[x][y].content==CellContent.WATER:
         return False
     while deq:
         x, y = deq.popleft()
@@ -389,9 +406,9 @@ def count_of_non_shooten(x,y,field):
                     continue
                 if (next_x, next_y) in viuved:
                     continue
-                if field[next_x][next_y].is_shooten and field[next_x][next_y].is_ship:
+                if field[next_x][next_y].shot_state==ShotState.HIT and field[next_x][next_y].content==CellContent.SHIP:
                     count_of_sooten += 1
-                if field[next_x][next_y].is_ship:
+                if field[next_x][next_y].content==CellContent.SHIP:
                     deq.append((next_x, next_y))
                     viuved.add((next_x, next_y))
     return viuved
@@ -496,7 +513,7 @@ def place_ships_enemy(field):
                             and 0 <= next_y < Constants.SIZE_BOARD
                         ):
                             continue
-                        if field[next_x][next_y].is_ship:
+                        if field[next_x][next_y].content==CellContent.SHIP:
                             can_place = False
             if not can_place:
                 continue
@@ -511,62 +528,20 @@ def place_ships_enemy(field):
 
 def players_ones_turn(turn, board, x_clict, y_clict):
     if turn:
-        if not board[x_clict][y_clict].is_shooten:
+        if board[x_clict][y_clict].shot_state==ShotState.NOT_SHOT:
             board[x_clict][y_clict].shoot()
             is_ship_died(x_clict, y_clict, game.field.enemy_field_see, True)
             # ultimate_ship_chec_func(x_clict, y_clict, field.enemy_field_see, SelectMode.IS_SHIP_DIED, is_players_board=True)
-            if board[x_clict][y_clict].is_ship:
+            if board[x_clict][y_clict].content==CellContent.SHIP:
                 return turn
             return not turn
         return turn
 
 
-def ais_turn(board, gratest_next_move=False):
-    rx = randint(0, 9)
-    ry = randint(0, 9)
-    rotations = [(0, 1), (1, 0), (-1, 0), (0, -1)]
-    game.gratest_move = False
-    while board[rx][ry].is_shooten:
-        rx = randint(0, 9)
-        ry = randint(0, 9)
-    next_move = True
-    if gratest_next_move:
-        rx, ry = gratest_next_move
-        board[rx][ry].shoot()
-        if board[rx][ry].is_ship:
-            next_move = False
-        for rot_x, rot_y in rotations:
-            next_x = rx + rot_x
-            next_y = ry + rot_y
-            if not (
-                0 <= next_x < Constants.SIZE_BOARD
-                and 0 <= next_y < Constants.SIZE_BOARD
-            ):
-                continue
-            if board[next_x][next_y].is_ship and not board[next_x][next_y].is_shooten:
-                game.gratest_move = (next_x, next_y)
-    else:
-        while (rx, ry) in game.near_ship_ai or board[rx][ry].is_shooten:
-            rx = randint(0, 9)
-            ry = randint(0, 9)
-
-        board[rx][ry].shoot()
-        if board[rx][ry].is_ship:
-            next_move = False
-            game.gratest_move = (rx, ry)
-        else:
-            game.gratest_move = False
-
-    check = is_ship_died(rx, ry, game.field.my_field_see)
-    if check:
-        game.near_ship_ai.update(do_step_on(check))
-    return game.gratest_move, next_move
-
-
 def check_los_or_vin(field):
     for row in field:
         for cord in row:
-            if cord.is_ship and not cord.is_shooten:
+            if cord.content==CellContent.SHIP and not cord.shot_state==ShotState.DESTROED:
                 return False
     return True
 
