@@ -2,7 +2,6 @@ from collections import deque, Counter
 from random import randint, choice ,shuffle
 from constants import Textures, Constants, GameStates,AiModes,Directions,ShotState,CellContent
 
-from testing import *
 
 HEIGHT = 500
 WIDTH = 900
@@ -69,7 +68,7 @@ class StatesOfGame:
             game.field.generate_field_enemy()
             game.field.generate_field_my()
             wrong = place_ships_enemy(game.field.enemy_field_see)
-            game.ai = Ais_Turns(game.field.my_field_see)
+            game.ai = ComputerPlayer(game.field.my_field_see)
             while not wrong:
                 game.field.generate_field_enemy()
                 wrong = place_ships_enemy(game.field.enemy_field_see)
@@ -116,7 +115,7 @@ class Field_Seeble:
         for _ in range(Constants.SIZE_BOARD):
             in_field = []
             for _ in range(Constants.SIZE_BOARD):
-                in_field.append(Cell())
+                in_field.append(Cell(True))
             field.append(in_field)
 
         self.enemy_field_see = field
@@ -178,7 +177,7 @@ class Field_Seeble:
             x += Constants.SIZE_PICTURE
 
 
-class Ais_Turns:
+class ComputerPlayer:
     def __init__(self,board):
         self.board=board
         self.rotations = [(0, 1), (1, 0), (-1, 0), (0, -1)]
@@ -287,12 +286,11 @@ class Game:
         self.field = Field_Seeble()
         self.game_state = StatesOfGame()
         self.field.generate_field_my()
-        self.ai = Ais_Turns(self.field.my_field_see)
+        self.ai = ComputerPlayer(self.field.my_field_see)
         self.ship_error = False
         self.count_ship_error = False
         self.ready_to_game = False
         self.is_player_turn = True
-        self.gratest_move = False
 
     def xy_but_set(self,x,y,button):
         self.x=x
