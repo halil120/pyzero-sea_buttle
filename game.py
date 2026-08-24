@@ -14,7 +14,6 @@ from constants import (
 HEIGHT = 500
 WIDTH = 900
 TITLE = "Sea Buttle"
-# одно поле равен ~38
 
 
 class Cell:
@@ -27,7 +26,7 @@ class Cell:
             case CellContent.WATER:
                 self.shot_state = ShotState.MISS
             case CellContent.SHIP:
-                if not self.shot_state == ShotState.DESTROED:
+                if not self.shot_state == ShotState.DESTROYED:
                     self.shot_state = ShotState.HIT
 
     def un_or_place_ship(self):
@@ -60,8 +59,8 @@ class Cell:
                         return Textures.SEA.value
                     case ShotState.HIT:
                         return Textures.BURNING.value
-                    case ShotState.DESTROED:
-                        return Textures.DESTROED.value
+                    case ShotState.DESTROYED:
+                        return Textures.DESTROYED.value
 
 
 class Board:
@@ -131,14 +130,14 @@ class ComputerPlayer:
         next_move = True
         # logic block
         if self.mode == AiModes.SEARCH:
-            x = randint(Constants.SIZE_BOARD)
-            y = randint(Constants.SIZE_BOARD)
+            x = randint(0,Constants.SIZE_BOARD-1)
+            y = randint(0,Constants.SIZE_BOARD-1)
             while (
                 not self.board[x][y].shot_state == ShotState.NOT_SHOT
                 or (x, y) in self.visited_dontmovehere
             ):
-                x = randint(Constants.SIZE_BOARD)
-                y = randint(Constants.SIZE_BOARD)
+                x = randint(0,Constants.SIZE_BOARD-1)
+                y = randint(0,Constants.SIZE_BOARD-1)
 
             self.board[x][y].shoot()
             if self.board[x][y].content == CellContent.WATER:
@@ -224,7 +223,7 @@ class ComputerPlayer:
         ship_cells = count_of_non_shooten(x, y, self.board)
         if self.hit_cells == ship_cells:
             for x, y in self.hit_cells:
-                self.board[x][y].shot_state = ShotState.DESTROED
+                self.board[x][y].shot_state = ShotState.DESTROYED
             self.visited_dontmovehere.update(do_step_on(ship_cells))
             self.hit_cells.clear()
             self.target_cells.clear()
@@ -423,7 +422,7 @@ def is_ship_died(x, y, field, is_for_player=False):
 
     if len(viuved) == count_of_sooten + 1:
         for x, y in viuved:
-            field[x][y].shot_state = ShotState.DESTROED
+            field[x][y].shot_state = ShotState.DESTROYED
         return viuved
     return False
 
@@ -602,7 +601,7 @@ def check_los_or_vin(field):
         for cord in row:
             if (
                 cord.content == CellContent.SHIP
-                and not cord.shot_state == ShotState.DESTROED
+                and not cord.shot_state == ShotState.DESTROYED
             ):
                 return False
     return True

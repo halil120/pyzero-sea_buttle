@@ -8,7 +8,7 @@ class Textures(Enum):
     MENU_BACKFONE = "menu_phone"
     LETS_GAME = "game_button"
     SHOOTEN_SEA = "shooten"
-    DESTROED = "enemy_ship_shooten"
+    DESTROYED = "enemy_ship_shooten"
 
 
 class GameStates(Enum):
@@ -44,7 +44,7 @@ class ShotState(Enum):
     NOT_SHOT = auto()
     MISS = auto()
     HIT = auto()
-    DESTROED = auto()
+    DESTROYED = auto()
     
     
 class Players(Enum):
