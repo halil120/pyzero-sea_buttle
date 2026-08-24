@@ -130,14 +130,14 @@ class ComputerPlayer:
         next_move = True
         # logic block
         if self.mode == AiModes.SEARCH:
-            x = randint(0, Constants.SIZE_BOARD - 1)
-            y = randint(0, Constants.SIZE_BOARD - 1)
+            x = randint(Constants.SIZE_BOARD)
+            y = randint(Constants.SIZE_BOARD)
             while (
                 not self.board[x][y].shot_state == ShotState.NOT_SHOT
                 or (x, y) in self.visited_dontmovehere
             ):
-                x = randint(0, Constants.SIZE_BOARD - 1)
-                y = randint(0, Constants.SIZE_BOARD - 1)
+                x = randint(Constants.SIZE_BOARD)
+                y = randint(Constants.SIZE_BOARD)
 
             self.board[x][y].shoot()
             if self.board[x][y].content == CellContent.WATER:
