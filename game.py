@@ -42,26 +42,6 @@ class Cell:
     def un_place_ship(self):
         self.content = CellContent.WATER
 
-    def texture_give(self, owner, see_ship=False):
-        match self.content:
-            case CellContent.WATER:
-                match self.shot_state:
-                    case ShotState.NOT_SHOT:
-                        return Textures.SEA.value
-                    case ShotState.MISS:
-                        return Textures.SHOOTEN_SEA.value
-
-            case CellContent.SHIP:
-                match self.shot_state:
-                    case ShotState.NOT_SHOT:
-                        if owner == Players.PLAYER or see_ship:
-                            return Textures.SHIP.value
-                        return Textures.SEA.value
-                    case ShotState.HIT:
-                        return Textures.BURNING.value
-                    case ShotState.DESTROYED:
-                        return Textures.DESTROYED.value
-
 
 class Board:
     def __init__(self, owner):
@@ -82,9 +62,7 @@ class Board:
         for i in range(Constants.SIZE_BOARD):
             y = Constants.SPASE_OF_SCREEN
             for j in range(Constants.SIZE_BOARD):
-                screen.blit(
-                    self.board[i][j].texture_give(self.board_owner, see_ships), (x, y)
-                )
+                screen.blit(self.texture_give(self.board[i][j], see_ships), (x, y))
                 y += Constants.SIZE_PICTURE
             x += Constants.SIZE_PICTURE
 
@@ -115,6 +93,25 @@ class Board:
         for x, y in test_data:
             self.board[x][y].place_ship()
 
+    def texture_give(self, cell, see_ship):
+        match cell.content:
+            case CellContent.WATER:
+                match cell.shot_state:
+                    case ShotState.NOT_SHOT:
+                        return Textures.SEA.value
+                    case ShotState.MISS:
+                        return Textures.SHOOTEN_SEA.value
+            case CellContent.SHIP:
+                match cell.shot_state:
+                    case ShotState.NOT_SHOT:
+                        if self.board_owner == Players.PLAYER or see_ship:
+                            return Textures.SHIP.value
+                        return Textures.SEA.value
+                    case ShotState.HIT:
+                        return Textures.BURNING.value
+                    case ShotState.DESTROYED:
+                        return Textures.DESTROYED.value
+
 
 class ComputerPlayer:
     def __init__(self, board):
@@ -122,7 +119,6 @@ class ComputerPlayer:
         self.rotations = [(0, 1), (1, 0), (-1, 0), (0, -1)]
         self.target_cells = set()
         self.hit_cells = set()
-        self.current_direction = None
         self.mode = AiModes.SEARCH
         self.visited_dontmovehere = set()
 
@@ -130,14 +126,14 @@ class ComputerPlayer:
         next_move = True
         # logic block
         if self.mode == AiModes.SEARCH:
-            x = randint(Constants.SIZE_BOARD)
-            y = randint(Constants.SIZE_BOARD)
+            x = randint(0, Constants.SIZE_BOARD - 1)
+            y = randint(0, Constants.SIZE_BOARD - 1)
             while (
                 not self.board[x][y].shot_state == ShotState.NOT_SHOT
                 or (x, y) in self.visited_dontmovehere
             ):
-                x = randint(Constants.SIZE_BOARD)
-                y = randint(Constants.SIZE_BOARD)
+                x = randint(0, Constants.SIZE_BOARD - 1)
+                y = randint(0, Constants.SIZE_BOARD - 1)
 
             self.board[x][y].shoot()
             if self.board[x][y].content == CellContent.WATER:
@@ -176,7 +172,7 @@ class ComputerPlayer:
                         return False
                     all_x = {x for x, y in self.hit_cells}
                     all_y = {y for x, y in self.hit_cells}
-                    # aaa
+
                     if len(all_x) < 2:
                         self.target_cells = set()
                         for tar_x, tar_y in self.hit_cells:
@@ -194,7 +190,6 @@ class ComputerPlayer:
                                 ):
                                     continue
                                 self.target_cells.add((tx, ty))
-                        self.current_direction = Directions.LEFT_RIGHT
                     elif len(all_y) < 2:
                         self.target_cells = set()
                         for tar_x, tar_y in self.hit_cells:
@@ -212,8 +207,6 @@ class ComputerPlayer:
                                 ):
                                     continue
                                 self.target_cells.add((tx, ty))
-                        self.current_direction = Directions.UP_DOUN
-                    # aaa
                     next_move = False
                     return next_move
         return next_move
@@ -231,8 +224,6 @@ class ComputerPlayer:
             self.current_direction = None
             return True
         return False
-
-        # logic block
 
 
 class Game:
@@ -571,9 +562,9 @@ def place_ships_enemy(field):
                 field[x][y].place_ship()
             placed = True
             break
-    # KFKDLUYFUYFLYFUL
-    game.player_field.fill_test()
-    # KFKDLUYFUYFLYFUL
+    # for developers
+    # game.player_field.fill_test()
+    # for developers
     if placed:
         return True
     return False
@@ -609,8 +600,8 @@ def do_step_on(ship):
                 next_x = x + dx
                 next_y = y + dy
                 if not (
-                    0 <= next_x < len(game.computer_field.board)
-                    and 0 <= next_y < len(game.computer_field.board[next_x])
+                    0 <= next_x < len(game.player_field.board)
+                    and 0 <= next_y < len(game.player_field.board[next_x])
                 ):
                     continue
                 if (next_x, next_y) in ship:
