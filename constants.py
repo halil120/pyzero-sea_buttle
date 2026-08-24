@@ -45,3 +45,8 @@ class ShotState(Enum):
     MISS = auto()
     HIT = auto()
     DESTROED = auto()
+    
+    
+class Players(Enum):
+    PLAYER=auto()
+    COMPUTER=auto()

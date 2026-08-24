@@ -1,7 +1,15 @@
 from collections import deque, Counter
-from random import randint, choice ,shuffle
-from constants import Textures, Constants, GameStates,AiModes,Directions,ShotState,CellContent
-
+from random import randint, choice
+from constants import (
+    Textures,
+    Constants,
+    GameStates,
+    AiModes,
+    Directions,
+    ShotState,
+    CellContent,
+    Players,
+)
 
 HEIGHT = 500
 WIDTH = 900
@@ -10,33 +18,32 @@ TITLE = "Sea Buttle"
 
 
 class Cell:
-    def __init__(self, is_player=False):
-        self.is_player = is_player
-        self.content=CellContent.WATER
-        self.shot_state=ShotState.NOT_SHOT
+    def __init__(self):
+        self.content = CellContent.WATER
+        self.shot_state = ShotState.NOT_SHOT
 
     def shoot(self):
         match self.content:
             case CellContent.WATER:
-                self.shot_state=ShotState.MISS
+                self.shot_state = ShotState.MISS
             case CellContent.SHIP:
-                if not self.shot_state==ShotState.DESTROED:
-                    self.shot_state=ShotState.HIT
+                if not self.shot_state == ShotState.DESTROED:
+                    self.shot_state = ShotState.HIT
 
     def un_or_place_ship(self):
         match self.content:
             case CellContent.WATER:
-                self.content=CellContent.SHIP
+                self.content = CellContent.SHIP
             case CellContent.SHIP:
-                self.content=CellContent.WATER
+                self.content = CellContent.WATER
 
     def place_ship(self):
-        self.content=CellContent.SHIP
+        self.content = CellContent.SHIP
 
     def un_place_ship(self):
-        self.content=CellContent.WATER
+        self.content = CellContent.WATER
 
-    def texture_give(self, see_ship=False):
+    def texture_give(self, owner, see_ship=False):
         match self.content:
             case CellContent.WATER:
                 match self.shot_state:
@@ -44,11 +51,11 @@ class Cell:
                         return Textures.SEA.value
                     case ShotState.MISS:
                         return Textures.SHOOTEN_SEA.value
-                
+
             case CellContent.SHIP:
                 match self.shot_state:
                     case ShotState.NOT_SHOT:
-                        if self.is_player or see_ship:
+                        if owner == Players.PLAYER or see_ship:
                             return Textures.SHIP.value
                         return Textures.SEA.value
                     case ShotState.HIT:
@@ -57,218 +64,167 @@ class Cell:
                         return Textures.DESTROED.value
 
 
-class StatesOfGame:
-    def __init__(self):
-        self.state = GameStates.MENU
+class Board:
+    def __init__(self, owner):
+        self.board_owner = owner
+        self.board = []
 
-    def state_MENU(self):
-        game.near_ship_ai = set()
-        game.is_player_turn = True
-        if 300 <= game.x < 600 and 150 <= game.y < 302:
-            game.field.generate_field_enemy()
-            game.field.generate_field_my()
-            wrong = place_ships_enemy(game.field.enemy_field_see)
-            game.ai = ComputerPlayer(game.field.my_field_see)
-            while not wrong:
-                game.field.generate_field_enemy()
-                wrong = place_ships_enemy(game.field.enemy_field_see)
-            game.game_state.state = GameStates.SHIPS_place
-
-    def state_SHIPS_place(self):
-        if 475 < game.x < 875 and 25 < game.y < 425:
-            clk_x, clk_y = pixel_to_cordinates(game.x, game.y, True)
-            game.field.my_field_see[clk_x][clk_y].un_or_place_ship()
-            valid_ship(game.field.my_field_see)
-            ships = valid_count_of_ship(game.field.my_field_see)
-            if check_ready_to_game(ships) == 20:
-                game.ready_to_game = True
-            else:
-                game.ready_to_game = False
-                
-        if not game.ship_error and game.ready_to_game and 100 <= game.x < 400 and 150 <= game.y < 302:
-            game.ready_to_game = False
-            game.game_state.state = GameStates.GAME
-
-    def state_GAME(self):
-        if 25 < game.x < 425 and 25 < game.y < 425:
-            clk_x, clk_y = pixel_to_cordinates(game.x, game.y)
-            game.is_player_turn = players_ones_turn(
-                game.is_player_turn, game.field.enemy_field_see, clk_x, clk_y
-            )
-            if check_los_or_vin(game.field.enemy_field_see):
-                game.game_state.state = GameStates.VICTORY
-
-        if 5 <= game.x < 63 and 475 <= game.y < 500:
-            game.game_state.state = GameStates.MENU
-        
-    def state_VIN_LOS(self):
-        if game.button:
-            game.game_state.state = GameStates.MENU
-
-
-class Field_Seeble:
-    def __init__(self):
-        pass
-
-    def generate_field_enemy(self):
+    def generate(self):
         field = []
         for _ in range(Constants.SIZE_BOARD):
             in_field = []
             for _ in range(Constants.SIZE_BOARD):
-                in_field.append(Cell(True))
+                in_field.append(Cell())
             field.append(in_field)
 
-        self.enemy_field_see = field
+        self.board = field
 
-    def draw_enemy(self, screen, see_ships=False):
-        x = Constants.SPASE_OF_SCREEN
+    def draw_field(self, screen, x, see_ships=False):
         for i in range(Constants.SIZE_BOARD):
             y = Constants.SPASE_OF_SCREEN
             for j in range(Constants.SIZE_BOARD):
-                screen.blit(self.enemy_field_see[i][j].texture_give(see_ships), (x, y))
+                screen.blit(
+                    self.board[i][j].texture_give(self.board_owner, see_ships), (x, y)
+                )
                 y += Constants.SIZE_PICTURE
             x += Constants.SIZE_PICTURE
-        return x + Constants.SPASE_OF_SCREEN * 2
 
-    def generate_field_my(self):
+    def fill_test(self):
+        test_data = [
+            (1, 1),
+            (1, 2),
+            (1, 3),
+            (1, 4),
+            (4, 2),
+            (4, 3),
+            (4, 4),
+            (7, 1),
+            (7, 2),
+            (7, 3),
+            (1, 9),
+            (2, 9),
+            (1, 7),
+            (2, 7),
+            (9, 9),
+            (9, 0),
+            (5, 9),
+            (7, 9),
+            (6, 6),
+            (5, 8),
+        ]
 
-        def fill_test(field):
-            test_data = [
-                (1, 1),
-                (1, 2),
-                (1, 3),
-                (1, 4),
-                (4, 2),
-                (4, 3),
-                (4, 4),
-                (7, 1),
-                (7, 2),
-                (7, 3),
-                (1, 9),
-                (2, 9),
-                (1, 7),
-                (2, 7),
-                (9, 9),
-                (9, 0),
-                (5, 9),
-                (7, 9),
-                (6, 6),
-                (5, 8),
-            ]
-
-            for x, y in test_data:
-                field[x][y].place_ship()
-
-        field = []
-        for _ in range(Constants.SIZE_BOARD):
-            in_field = []
-            for _ in range(Constants.SIZE_BOARD):
-                in_field.append(Cell(True))
-            field.append(in_field)
-        fill_test(field)
-        self.my_field_see = field
-
-    def draw_my(self, screen, x):
-        for i in range(Constants.SIZE_BOARD):
-            y = Constants.SPASE_OF_SCREEN
-            for j in range(Constants.SIZE_BOARD):
-                screen.blit(self.my_field_see[i][j].texture_give(), (x, y))
-                y += Constants.SIZE_PICTURE
-            x += Constants.SIZE_PICTURE
+        for x, y in test_data:
+            self.board[x][y].place_ship()
 
 
 class ComputerPlayer:
-    def __init__(self,board):
-        self.board=board
+    def __init__(self, board):
+        self.board = board
         self.rotations = [(0, 1), (1, 0), (-1, 0), (0, -1)]
-        self.target_cells=set()
-        self.hit_cells=set()
-        self.current_direction=None
-        self.mode=AiModes.SEARCH
-        self.visited_dontmovehere=set()
+        self.target_cells = set()
+        self.hit_cells = set()
+        self.current_direction = None
+        self.mode = AiModes.SEARCH
+        self.visited_dontmovehere = set()
 
     def move(self):
         next_move = True
-        #logic block
-        if self.mode==AiModes.SEARCH:
-            x = randint(0, 9)
-            y = randint(0, 9)
-            while not self.board[x][y].shot_state==ShotState.NOT_SHOT or (x,y) in self.visited_dontmovehere:
-                x = randint(0, 9)
-                y = randint(0, 9)
-                
+        # logic block
+        if self.mode == AiModes.SEARCH:
+            x = randint(Constants.SIZE_BOARD)
+            y = randint(Constants.SIZE_BOARD)
+            while (
+                not self.board[x][y].shot_state == ShotState.NOT_SHOT
+                or (x, y) in self.visited_dontmovehere
+            ):
+                x = randint(Constants.SIZE_BOARD)
+                y = randint(Constants.SIZE_BOARD)
+
             self.board[x][y].shoot()
-            if self.board[x][y].content==CellContent.WATER:
+            if self.board[x][y].content == CellContent.WATER:
                 next_move = True
-            elif self.board[x][y].content==CellContent.SHIP:
-                if self.reset(x,y):
+            elif self.board[x][y].content == CellContent.SHIP:
+                if self.reset(x, y):
                     return False
                 self.mode = AiModes.HUNTING
-                for mx,my in self.rotations:
-                    next_x=x+mx
-                    next_y=y+my
-                    self.target_cells.add((next_x,next_y))  
+                for mx, my in self.rotations:
+                    next_x = x + mx
+                    next_y = y + my
+                    self.target_cells.add((next_x, next_y))
                 return False
-        elif self.mode==AiModes.HUNTING:
+        elif self.mode == AiModes.HUNTING:
             if not self.target_cells:
-                self.mode=AiModes.SEARCH
+                self.mode = AiModes.SEARCH
                 self.hit_cells.clear()
                 return True
             while self.target_cells:
-                x,y=choice(list(self.target_cells))
-                self.target_cells.discard((x,y))
-                if (x,y) in self.visited_dontmovehere:
+                x, y = choice(list(self.target_cells))
+                self.target_cells.discard((x, y))
+                if (x, y) in self.visited_dontmovehere:
                     continue
-                if not (0 <= x < Constants.SIZE_BOARD and 0 <= y < Constants.SIZE_BOARD):
+                if not (
+                    0 <= x < Constants.SIZE_BOARD and 0 <= y < Constants.SIZE_BOARD
+                ):
                     continue
-                if not self.board[x][y].shot_state==ShotState.NOT_SHOT:
+                if not self.board[x][y].shot_state == ShotState.NOT_SHOT:
                     continue
                 self.board[x][y].shoot()
-                if not self.board[x][y].content==CellContent.SHIP:
+                if not self.board[x][y].content == CellContent.SHIP:
                     next_move = True
                     return next_move
-                elif self.board[x][y].content==CellContent.SHIP:
-                    if self.reset(x,y):
+                elif self.board[x][y].content == CellContent.SHIP:
+                    if self.reset(x, y):
                         return False
                     all_x = {x for x, y in self.hit_cells}
                     all_y = {y for x, y in self.hit_cells}
-                    #aaa
-                    if len(all_x)<2:
-                        self.target_cells=set()
-                        for tar_x,tar_y in self.hit_cells:
-                            for rot_x,rot_y in ((0, -1) ,(0, 1)):
-                                tx=tar_x+rot_x
-                                ty=tar_y+rot_y
-                                if not (0 <= tx < Constants.SIZE_BOARD and 0 <= ty < Constants.SIZE_BOARD):
+                    # aaa
+                    if len(all_x) < 2:
+                        self.target_cells = set()
+                        for tar_x, tar_y in self.hit_cells:
+                            for rot_x, rot_y in ((0, -1), (0, 1)):
+                                tx = tar_x + rot_x
+                                ty = tar_y + rot_y
+                                if not (
+                                    0 <= tx < Constants.SIZE_BOARD
+                                    and 0 <= ty < Constants.SIZE_BOARD
+                                ):
                                     continue
-                                if not self.board[tx][ty].shot_state==ShotState.NOT_SHOT:
+                                if (
+                                    not self.board[tx][ty].shot_state
+                                    == ShotState.NOT_SHOT
+                                ):
                                     continue
-                                self.target_cells.add((tx,ty))
-                        self.current_direction=Directions.LEFT_RIGHT
-                    elif len(all_y)<2:
-                        self.target_cells=set()
-                        for tar_x,tar_y in self.hit_cells:
-                            for rot_x,rot_y in ((-1, 0), (1, 0)):
-                                tx=tar_x+rot_x
-                                ty=tar_y+rot_y
-                                if not (0 <= tx < Constants.SIZE_BOARD and 0 <= ty < Constants.SIZE_BOARD):
+                                self.target_cells.add((tx, ty))
+                        self.current_direction = Directions.LEFT_RIGHT
+                    elif len(all_y) < 2:
+                        self.target_cells = set()
+                        for tar_x, tar_y in self.hit_cells:
+                            for rot_x, rot_y in ((-1, 0), (1, 0)):
+                                tx = tar_x + rot_x
+                                ty = tar_y + rot_y
+                                if not (
+                                    0 <= tx < Constants.SIZE_BOARD
+                                    and 0 <= ty < Constants.SIZE_BOARD
+                                ):
                                     continue
-                                if not self.board[tx][ty].shot_state==ShotState.NOT_SHOT:
+                                if (
+                                    not self.board[tx][ty].shot_state
+                                    == ShotState.NOT_SHOT
+                                ):
                                     continue
-                                self.target_cells.add((tx,ty))
-                        self.current_direction=Directions.UP_DOUN
-                    #aaa
+                                self.target_cells.add((tx, ty))
+                        self.current_direction = Directions.UP_DOUN
+                    # aaa
                     next_move = False
                     return next_move
         return next_move
-                    
 
     def reset(self, x, y):
         self.hit_cells.add((x, y))
         ship_cells = count_of_non_shooten(x, y, self.board)
         if self.hit_cells == ship_cells:
-            for x,y in self.hit_cells:
-                self.board[x][y].shot_state=ShotState.DESTROED
+            for x, y in self.hit_cells:
+                self.board[x][y].shot_state = ShotState.DESTROED
             self.visited_dontmovehere.update(do_step_on(ship_cells))
             self.hit_cells.clear()
             self.target_cells.clear()
@@ -277,25 +233,73 @@ class ComputerPlayer:
             return True
         return False
 
-            
-        #logic block
+        # logic block
 
 
 class Game:
     def __init__(self):
-        self.field = Field_Seeble()
-        self.game_state = StatesOfGame()
-        self.field.generate_field_my()
-        self.ai = ComputerPlayer(self.field.my_field_see)
+        self.player_field = Board(Players.PLAYER)
+        self.computer_field = Board(Players.COMPUTER)
+        self.state = GameStates.MENU
+        self.ai = ComputerPlayer(self.player_field.board)
         self.ship_error = False
         self.count_ship_error = False
         self.ready_to_game = False
         self.is_player_turn = True
 
-    def xy_but_set(self,x,y,button):
-        self.x=x
-        self.y=y
-        self.button=button
+    def xy_but_set(self, x, y, button):
+        self.x = x
+        self.y = y
+        self.button = button
+
+    def state_MENU(self):
+        self.near_ship_ai = set()
+        self.is_player_turn = True
+        if 300 <= self.x < 600 and 150 <= self.y < 302:
+            self.player_field.generate()
+            self.computer_field.generate()
+            wrong = place_ships_enemy(self.computer_field.board)
+            self.ai = ComputerPlayer(self.player_field.board)
+            while not wrong:
+                self.computer_field.generate()
+                wrong = place_ships_enemy(self.computer_field.board)
+            self.state = GameStates.SHIPS_place
+
+    def state_SHIPS_place(self):
+        if 475 < self.x < 875 and 25 < self.y < 425:
+            clk_x, clk_y = pixel_to_cordinates(self.x, self.y, True)
+            self.player_field.board[clk_x][clk_y].un_or_place_ship()
+            valid_ship(self.player_field.board)
+            ships = valid_count_of_ship(self.player_field.board)
+            if check_ready_to_game(ships) == 20:
+                self.ready_to_game = True
+            else:
+                self.ready_to_game = False
+
+        if (
+            not self.ship_error
+            and self.ready_to_game
+            and 100 <= self.x < 400
+            and 150 <= self.y < 302
+        ):
+            self.ready_to_game = False
+            self.state = GameStates.GAME
+
+    def state_GAME(self):
+        if 25 < self.x < 425 and 25 < self.y < 425:
+            clk_x, clk_y = pixel_to_cordinates(self.x, self.y)
+            self.is_player_turn = players_ones_turn(
+                self.is_player_turn, self.computer_field.board, clk_x, clk_y
+            )
+            if check_los_or_vin(self.computer_field.board):
+                self.state = GameStates.VICTORY
+
+        if 5 <= self.x < 63 and 475 <= self.y < 500:
+            self.state = GameStates.MENU
+
+    def state_VIN_LOS(self):
+        if self.button:
+            self.state = GameStates.MENU
 
 
 def get_ship_length(field, start_x, start_y):
@@ -313,7 +317,7 @@ def get_ship_length(field, start_x, start_y):
                     continue
                 if (next_x, next_y) in visited:
                     continue
-                if field[next_x][next_y].content==CellContent.SHIP:
+                if field[next_x][next_y].content == CellContent.SHIP:
                     queue.append((next_x, next_y))
                     visited.add((next_x, next_y))
 
@@ -327,7 +331,9 @@ def get_ship_length(field, start_x, start_y):
                 next_y = y + dy
                 if not (0 <= next_x < len(field) and 0 <= next_y < len(field[next_x])):
                     continue
-                if (next_x, next_y) not in visited and field[next_x][next_y].content==CellContent.SHIP:
+                if (next_x, next_y) not in visited and field[next_x][
+                    next_y
+                ].content == CellContent.SHIP:
                     ship_nearby = True
     all_x = {x for x, y in visited}
     all_y = {y for x, y in visited}
@@ -343,7 +349,7 @@ def valid_count_of_ship(field):
     eczample = Counter({1: 4, 2: 3, 3: 2, 4: 1})
     for i in range(Constants.SIZE_BOARD):
         for j in range(Constants.SIZE_BOARD):
-            if not field[i][j].content==CellContent.SHIP:
+            if not field[i][j].content == CellContent.SHIP:
                 continue
             if (i, j) in visited or (i, j) in all_visited:
                 continue
@@ -364,7 +370,7 @@ def valid_count_of_ship(field):
                             continue
                         if (next_x, next_y) in visited:
                             continue
-                        if field[next_x][next_y].content==CellContent.SHIP:
+                        if field[next_x][next_y].content == CellContent.SHIP:
                             queue.append((next_x, next_y))
                             visited.add((next_x, next_y))
                             all_visited.add((next_x, next_y))
@@ -384,7 +390,7 @@ def is_ship_died(x, y, field, is_for_player=False):
     deq = deque([(x, y)])
     viuved = set([(x, y)])
     count_of_sooten = 0
-    if not field[x][y].content==CellContent.SHIP:
+    if not field[x][y].content == CellContent.SHIP:
         return False
     while deq:
         x, y = deq.popleft()
@@ -406,15 +412,18 @@ def is_ship_died(x, y, field, is_for_player=False):
                     continue
                 if (next_x, next_y) in viuved:
                     continue
-                if field[next_x][next_y].shot_state==ShotState.HIT and field[next_x][next_y].content==CellContent.SHIP:
+                if (
+                    field[next_x][next_y].shot_state == ShotState.HIT
+                    and field[next_x][next_y].content == CellContent.SHIP
+                ):
                     count_of_sooten += 1
-                if field[next_x][next_y].content==CellContent.SHIP:
+                if field[next_x][next_y].content == CellContent.SHIP:
                     deq.append((next_x, next_y))
                     viuved.add((next_x, next_y))
 
     if len(viuved) == count_of_sooten + 1:
         for x, y in viuved:
-            field[x][y].shot_state=ShotState.DESTROED
+            field[x][y].shot_state = ShotState.DESTROED
         return viuved
     return False
 
@@ -423,18 +432,18 @@ def valid_ship(field):
     game.ship_error = False
     for row in range(Constants.SIZE_BOARD):
         for col in range(Constants.SIZE_BOARD):
-            if not field[row][col].content==CellContent.SHIP:
+            if not field[row][col].content == CellContent.SHIP:
                 continue
             len_ship, is_straight, ship_nearby = get_ship_length(field, row, col)
             if len_ship > 4 or ship_nearby or not is_straight:
                 game.ship_error = True
 
 
-def count_of_non_shooten(x,y,field):
+def count_of_non_shooten(x, y, field):
     deq = deque([(x, y)])
     viuved = set([(x, y)])
     count_of_sooten = 0
-    if field[x][y].content==CellContent.WATER:
+    if field[x][y].content == CellContent.WATER:
         return False
     while deq:
         x, y = deq.popleft()
@@ -451,9 +460,12 @@ def count_of_non_shooten(x,y,field):
                     continue
                 if (next_x, next_y) in viuved:
                     continue
-                if field[next_x][next_y].shot_state==ShotState.HIT and field[next_x][next_y].content==CellContent.SHIP:
+                if (
+                    field[next_x][next_y].shot_state == ShotState.HIT
+                    and field[next_x][next_y].content == CellContent.SHIP
+                ):
                     count_of_sooten += 1
-                if field[next_x][next_y].content==CellContent.SHIP:
+                if field[next_x][next_y].content == CellContent.SHIP:
                     deq.append((next_x, next_y))
                     viuved.add((next_x, next_y))
     return viuved
@@ -476,37 +488,37 @@ def pixel_to_cordinates(x, y, my=False):
 
 
 def backfill(screen):
-    if game.game_state.state == GameStates.MENU:
+    if game.state == GameStates.MENU:
         screen.blit(Textures.MENU_BACKFONE.value, (0, 0))
         screen.blit(Textures.LETS_GAME.value, (300, 150))
     elif (
-        game.game_state.state == GameStates.SHIPS_place
-        or game.game_state.state == GameStates.GAME
+        game.state == GameStates.SHIPS_place
+        or game.state == GameStates.GAME
     ):
         screen.blit("sea", (-200, -200))
-        x = game.field.draw_enemy(screen)
-        game.field.draw_my(screen, x)
+        game.computer_field.draw_field(screen, 25)
+        game.player_field.draw_field(screen, 475)
         screen.draw.text("my field", (630, 440), fontsize=50)
         screen.draw.text("enemy field", (130, 440), fontsize=50)
         if game.ready_to_game and not game.ship_error:
             screen.blit(Textures.LETS_GAME.value, (100, 150))
-        if game.game_state.state == GameStates.GAME:
+        if game.state == GameStates.GAME:
             screen.blit("insta_loose", (5, 475))
     elif (
-        game.game_state.state == GameStates.VICTORY or game.game_state.state == GameStates.DEFEAT
+        game.state == GameStates.VICTORY
+        or game.state == GameStates.DEFEAT
     ):
         screen.blit("sea", (-200, -200))
-        x = game.field.draw_enemy(screen, True)
-        game.field.draw_my(screen, x)
-        # screen.fill((51, 204, 242))
-        if game.game_state.state == GameStates.VICTORY:
+        game.computer_field.draw_field(screen, 25, True)
+        game.player_field.draw_field(screen, 475)
+        if game.state == GameStates.VICTORY:
             screen.draw.text("!VICTORY!", (350, 200), fontsize=75, color="white")
-        elif game.game_state.state == GameStates.DEFEAT:
+        elif game.state == GameStates.DEFEAT:
             screen.draw.text("DEFEAT", (350, 200), fontsize=75, color="red")
 
 
 def error(screen):
-    if game.game_state.state == GameStates.SHIPS_place:
+    if game.state == GameStates.SHIPS_place:
         if game.ship_error:
             screen.draw.text("ship error", (550, 200), fontsize=74, color="white")
         elif game.count_ship_error:
@@ -558,7 +570,7 @@ def place_ships_enemy(field):
                             and 0 <= next_y < Constants.SIZE_BOARD
                         ):
                             continue
-                        if field[next_x][next_y].content==CellContent.SHIP:
+                        if field[next_x][next_y].content == CellContent.SHIP:
                             can_place = False
             if not can_place:
                 continue
@@ -566,6 +578,9 @@ def place_ships_enemy(field):
                 field[x][y].place_ship()
             placed = True
             break
+    # KFKDLUYFUYFLYFUL
+    game.player_field.fill_test()
+    # KFKDLUYFUYFLYFUL
     if placed:
         return True
     return False
@@ -573,11 +588,10 @@ def place_ships_enemy(field):
 
 def players_ones_turn(turn, board, x_clict, y_clict):
     if turn:
-        if board[x_clict][y_clict].shot_state==ShotState.NOT_SHOT:
+        if board[x_clict][y_clict].shot_state == ShotState.NOT_SHOT:
             board[x_clict][y_clict].shoot()
-            is_ship_died(x_clict, y_clict, game.field.enemy_field_see, True)
-            # ultimate_ship_chec_func(x_clict, y_clict, field.enemy_field_see, SelectMode.IS_SHIP_DIED, is_players_board=True)
-            if board[x_clict][y_clict].content==CellContent.SHIP:
+            is_ship_died(x_clict, y_clict, game.computer_field.board, True)
+            if board[x_clict][y_clict].content == CellContent.SHIP:
                 return turn
             return not turn
         return turn
@@ -586,7 +600,10 @@ def players_ones_turn(turn, board, x_clict, y_clict):
 def check_los_or_vin(field):
     for row in field:
         for cord in row:
-            if cord.content==CellContent.SHIP and not cord.shot_state==ShotState.DESTROED:
+            if (
+                cord.content == CellContent.SHIP
+                and not cord.shot_state == ShotState.DESTROED
+            ):
                 return False
     return True
 
@@ -599,8 +616,8 @@ def do_step_on(ship):
                 next_x = x + dx
                 next_y = y + dy
                 if not (
-                    0 <= next_x < len(game.field.my_field_see)
-                    and 0 <= next_y < len(game.field.my_field_see[next_x])
+                    0 <= next_x < len(game.computer_field.board)
+                    and 0 <= next_y < len(game.computer_field.board[next_x])
                 ):
                     continue
                 if (next_x, next_y) in ship:
@@ -609,7 +626,7 @@ def do_step_on(ship):
     return not_choose_this
 
 
-game=Game()
+game = Game()
 
 
 def draw():
@@ -619,26 +636,26 @@ def draw():
 
 
 def update():
-    if game.game_state.state == GameStates.GAME:
+    if game.state == GameStates.GAME:
         if not game.is_player_turn:
             next_move = game.ai.move()
-            if check_los_or_vin(game.field.my_field_see):
-                game.game_state.state = GameStates.DEFEAT
+            if check_los_or_vin(game.player_field.board):
+                game.state = GameStates.DEFEAT
             game.is_player_turn = next_move
 
 
 def on_mouse_up(pos, button):
     x, y = pos
-    game.xy_but_set(x,y,button)
-    match game.game_state.state:
+    game.xy_but_set(x, y, button)
+    match game.state:
         case GameStates.MENU:
-            game.game_state.state_MENU()
+            game.state_MENU()
 
         case GameStates.SHIPS_place:
-            game.game_state.state_SHIPS_place()
+            game.state_SHIPS_place()
 
         case GameStates.GAME:
-            game.game_state.state_GAME()
+            game.state_GAME()
 
         case GameStates.VICTORY | GameStates.DEFEAT:
-            game.game_state.state_VIN_LOS()
+            game.state_VIN_LOS()
