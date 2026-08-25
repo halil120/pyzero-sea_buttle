@@ -5,7 +5,6 @@ from constants import (
     Constants,
     GameStates,
     AiModes,
-    Directions,
     ShotState,
     CellContent,
     Players,
@@ -45,7 +44,7 @@ class Cell:
 
 class Board:
     def __init__(self, owner):
-        self.board_owner = owner
+        self.owner = owner
         self.board = []
 
     def generate(self):
@@ -104,7 +103,7 @@ class Board:
             case CellContent.SHIP:
                 match cell.shot_state:
                     case ShotState.NOT_SHOT:
-                        if self.board_owner == Players.PLAYER or see_ship:
+                        if self.owner == Players.PLAYER or see_ship:
                             return Textures.SHIP.value
                         return Textures.SEA.value
                     case ShotState.HIT:
